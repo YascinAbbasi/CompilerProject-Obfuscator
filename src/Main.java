@@ -22,10 +22,59 @@ public class Main {
                     }
         """;
         String code4 = """
-           int add(int x, int y) {
+           int main(int x, int y) {
                        int sum = x + y;
+                       
+                  
+                      
                        return sum;
+      
                    }
+        """;
+        String code5 = """
+           if (x > 0) {
+                       int y = 1;
+                       if (y < 5) {
+                           x = x + 1;
+                       } else {
+                           while (y < 10) {
+                               y = y + 1;
+                           }
+                       }
+                   } else {
+                       for (int i = 0; i < 5; i = i + 1) {
+                           x = x - 1;
+                       }
+                   }
+                
+        """;
+        String code6 = """
+           int i = 0;
+                   while (i < 3) {
+                       int j = 0;
+                       while (j < 2) {
+                        if (x > 0) {
+                       int y = 1;
+                       if (y < 5) {
+                           x = x + 1;
+                       } else {
+                           while (y < 10) {
+                               y = y + 1;
+                           }
+                       }
+                   } else {
+                       for (int i = 0; i < 5; i = i + 1) {
+                           x = x - 1;
+                           main(x,y);
+                           asd(i,j,x);
+                          
+                       }
+                   }
+                           j = j + 1 - 123;
+                       }
+                       i = i + 1;
+                   }
+        
         """;
 
         Lexer lexer = new Lexer(code);
