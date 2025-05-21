@@ -129,7 +129,7 @@ public class Main {
             String outputPath = "D:\\UNI\\TERM6\\Compiler\\output.mc";
             String inputCode = new String(Files.readAllBytes(Paths.get(inputPath)));
             PrintWriter writer = new PrintWriter(outputPath);
-
+            //Start
             Lexer lexer = new Lexer(inputCode);
             List<Token> tokens = lexer.tokenize();
             for (Token token : tokens) {
