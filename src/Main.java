@@ -125,8 +125,8 @@ public class Main {
 
 
 
-            String inputPath = "D:\\UNI\\TERM6\\Compiler\\input5.mc";
-            String outputPath = "D:\\UNI\\TERM6\\Compiler\\output5.mc";
+            String inputPath = "D:\\UNI\\TERM6\\Compiler\\input.mc";
+            String outputPath = "D:\\UNI\\TERM6\\Compiler\\output.mc";
             String inputCode = new String(Files.readAllBytes(Paths.get(inputPath)));
             PrintWriter writer = new PrintWriter(outputPath);
 
