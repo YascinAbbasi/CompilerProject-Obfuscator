@@ -6,17 +6,23 @@ This project implements a code obfuscator for a simplified version of the C prog
 
 How to Run:
 1. Compile the project
+
 2.Place your Mini C input in a file named input.mc
+
 3.Run the program
+
 4.The obfuscated output will be written to output.mc
    
 Obfuscation Techniques Applied:
 
 Variable name obfuscation (e.g. x → a0)
+
 Expression transformation (e.g. x + y → x - (-y))
+
 Dead code insertion (e.g. if (0) { int dummy = 0; })
 
 How We Test Functional Equivalence:
+
 To ensure that the obfuscated code behaves exactly like the original:
 
 We compile and execute both versions of the code.
