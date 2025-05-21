@@ -10,7 +10,7 @@ public class Lexer {
             "int", "char", "bool", "if", "else", "while", "for", "return", "true", "false", "void", "printf", "scanf"
     );
     private static final Set<String> operators = Set.of(
-            "+", "-", "*", "/", "=", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!"
+            "+", "-", "*", "/", "=", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!", "&"
     );
     private static final Set<String> separators = Set.of(
             "(", ")", "{", "}", ";", ","

@@ -1,90 +1,153 @@
+
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
+
 
 public class Main {
     public static void main(String[] args) {
+        try {
+            String input1 = """
+                         int main() {
+                                                            int x = 3;
+                                                           if (x > 0) {
+                                                               if (x > 100) {
+                                                                   x = 100;
+                                                               } else {
+                                                                   x = x + 1;
+                                                               }
+                                                           } else {
+                                                               x = -1;
+                                                           }
+                                                           printf("%d\\n",x);
+                                                       }
+                    """;
+            String input2 = """
+                        int add(int a, int b) {
+                                   int result = a + b;
+                                   return result;
+                               }
+                    
+                               int main() {
+                                   int x = 3;
+                                   int y = 4;
+                                   int sum = add(x, y);
+                                   printf("%d\\n",sum);
+                               }
+                    """;
 
-        String code = """
-            if (x > 10) {
-                        y = 5;
-                    } else {
-                        y = 6;
-                    }
-        """;
-        String code2 = """
-            int x = 0;
-                    while (x < 5) {
-                       x = 2 * (435 - y) / a;
-                    }
-        """;
-        String code3 = """
-            for (int i = 0; i < 5; i = i + 1) {
-                        x = x + 1;
-                    }
-        """;
-        String code4 = """
-           int main(int x, int y) {
-                       int sum = x + y;
-                       
-                  
-                      
-                       return sum;
-      
-                   }
-        """;
-        String code5 = """
-           if (x > 0) {
-                       int y = 1;
-                       if (y < 5) {
-                           x = x + 1;
-                       } else {
-                           while (y < 10) {
-                               y = y + 1;
-                           }
-                       }
-                   } else {
-                       for (int i = 0; i < 5; i = i + 1) {
-                           x = x - 1;
-                       }
-                   }
+            String input3 = """
+                       int compute(int a) {
+                                  if (a == 0) {
+                                      return 0;
+                                  } else {
+                                      return a * 2;
+                                  }
+                              }
+                      int main() {
+                                  int i;
+                                  int val = 0;
+                                  scanf("%d", &val);
+                                   i = compute(val); 
+                                      printf("%d", i);
                 
-        """;
-        String code6 = """
-           int i = 0;
-                   while (i < 3) {
-                       int j = 0;
-                       while (j < 2) {
-                        if (x > 0) {
-                       int y = 1;
-                       if (y < 5) {
-                           x = x + 1;
-                       } else {
-                           while (y < 10) {
-                               y = y + 1;
-                           }
-                       }
-                   } else {
-                       for (int i = 0; i < 5; i = i + 1) {
-                           x = x - 1;
-                           main(x,y);
-                           asd(i,j,x);
-                          
-                       }
-                   }
-                           j = j + 1 - 123;
-                       }
-                       i = i + 1;
-                   }
-        
-        """;
+                                  return 0;
+                              }
+                    """;
+            String input4 = """
+                      int average(int a, int b, int c) {
+                                                 int sum = a + b + c;
+                                                 int avg = sum / 3;
+                                                 return avg;
+                                             }
+                                        
+                                             int main() {
+                                                 int x = 0;
+                      				int y = 0;
+                      				int z = 0;
+                                                 scanf("%d", &x);
+                                                 scanf("%d", &y);
+                                                 scanf("%d", &z);
+                                         
+                                                 int avg = average(x, y, z);
+                                         
+                                                 if (avg > 50) {
+                                                     printf("Passed\\n");
+                                                 } else {
+                                                     if (avg == 50) {
+                                                         printf("Barely passed\\n");
+                                                     } else {
+                                                         printf("Failed\\n");
+                                                     }
+                                                 }
+                                         
+                                                 return avg;
+                                             }
+                    
+                    """;
+            String input5 = """
+                      int isEven(int n) {
+                          while (n >= 2) {
+                              n = n - 2;
+                          }
+                          if (n == 0) {
+                              return 1;
+                          } else {
+                              return 0;
+                          }
+                      }
+                    
+                      int main() {
+                          int sum = 0;
+                          int limit = 0;
+                          int Temp = 0;
+                          scanf("%d", &limit);
+                    
+                          for(int i = 1; i <= limit; i = i + 1){
+                          Temp = isEven(i);
+                              
+                              if (Temp == 1) {
+                   
+                                  sum = sum + i;
+                              }
+                          }
+                    
+                          printf("Sum of evens: %d\\n", sum);
+                          return 0;
+                      }
+                    
+                    
+                    """;
 
-        Lexer lexer = new Lexer(code);
-        List<Token> tokens = lexer.tokenize();
-        for (Token token : tokens) {
-            System.out.println(token);
+
+
+
+            String inputPath = "D:\\UNI\\TERM6\\Compiler\\input5.mc";
+            String outputPath = "D:\\UNI\\TERM6\\Compiler\\output5.mc";
+            String inputCode = new String(Files.readAllBytes(Paths.get(inputPath)));
+            PrintWriter writer = new PrintWriter(outputPath);
+
+            Lexer lexer = new Lexer(inputCode);
+            List<Token> tokens = lexer.tokenize();
+            for (Token token : tokens) {
+                System.out.println(token);
+            }
+
+            Parser parser = new Parser(tokens, writer);
+            parser.parseProgram();
+            writer.close();
+
+        } catch (IOException e) {
+            System.err.println(" File error: " + e.getMessage());
+        } catch (RuntimeException e) {
+            System.err.println(" Parse error: " + e.getMessage());
         }
-
-        Parser parser = new Parser(tokens);
-        parser.parseProgram();
-
     }
+
+
+
+
 }
