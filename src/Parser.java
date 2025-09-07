@@ -1,4 +1,4 @@
-import java.io.PrintWriter;
+  import java.io.PrintWriter;
 import java.util.*;
 
 public class Parser {
@@ -6,15 +6,24 @@ public class Parser {
     private int index = 0;
     private PrintWriter writer;
 
-    private Map<String, String> obfuscationMap = new HashMap<>();
+
+    private Map<String, String> deobfMap = new HashMap<>();
     private int varCount = 0;
+
+
+    private Map<String, String> funcMap = new HashMap<>();
+    private int funcCount = 1;
+
+
+    private final List<String> simpleNames = Arrays.asList(
+            "x","y","z","a","b","c","d","m","n","j","i","k"
+    );
+    private int simpleIndex = 0;
 
     public Parser(List<Token> tokens, PrintWriter writer) {
         this.tokens = tokens;
         this.writer = writer;
-
     }
-
 
     private Token peek() {
         if (index < tokens.size()) {
@@ -30,7 +39,7 @@ public class Parser {
         return new Token(TokenType.EOF, "");
     }
 
-    private boolean match(TokenType type,boolean advance) {
+    private boolean match(TokenType type, boolean advance) {
         if (peek().type == type) {
             if (advance) {
                 advance();
@@ -44,14 +53,32 @@ public class Parser {
         throw new RuntimeException("Parse Error: " + msg);
     }
 
+    private String getDeobfuscatedName(String original) {
 
-    private String getObfuscatedName(String original) {
-        if (!obfuscationMap.containsKey(original)) {
-            obfuscationMap.put(original, "a" + varCount++);
+        if (simpleNames.contains(original)) {
+            return original;
         }
-        return obfuscationMap.get(original);
+        if (deobfMap.containsKey(original)) {
+            return deobfMap.get(original);
+        }
+        if (simpleIndex < simpleNames.size()) {
+            String name = simpleNames.get(simpleIndex++);
+            deobfMap.put(original, name);
+            return name;
+        }
+
+        String fallback = "var" + (varCount++);
+        deobfMap.put(original, fallback);
+        return fallback;
     }
 
+    private String getDeobfuscatedFunctionName(String original) {
+        if ("main".equals(original)) return "main";
+        if (funcMap.containsKey(original)) return funcMap.get(original);
+        String name = "Function" + (funcCount++);
+        funcMap.put(original, name);
+        return name;
+    }
 
     public void parseProgram() {
         while (peek().type != TokenType.EOF) {
@@ -59,9 +86,27 @@ public class Parser {
         }
     }
 
-
     private void parseStatement() {
         Token current = peek();
+
+
+        if (current.type == TokenType.KEYWORD && current.value.equals("int")) {
+
+            if (index + 1 < tokens.size() && tokens.get(index + 1).type == TokenType.IDENTIFIER) {
+                String nextName = tokens.get(index + 1).value;
+                if (nextName.startsWith("deadVar")) {
+
+                    advance();
+                    advance();
+
+                    while (peek().type != TokenType.EOF && !peek().value.equals(";")) {
+                        advance();
+                    }
+                    if (peek().value.equals(";")) advance();
+                    return;
+                }
+            }
+        }
 
         if (current.type == TokenType.KEYWORD) {
             switch (current.value) {
@@ -69,13 +114,11 @@ public class Parser {
                 case "char":
                 case "bool":
                 case "void":
-
                     if (index + 2 < tokens.size() && tokens.get(index + 2).value.equals("(")) {
                         parseFunctionDeclaration();
                     } else {
                         parseVariableDeclaration();
                     }
-
                     return;
 
                 case "if":
@@ -98,50 +141,53 @@ public class Parser {
                 case "scanf":
                     parseScanf();
                     return;
-
             }
         }
 
         if (current.type == TokenType.IDENTIFIER) {
 
+            if (current.value.startsWith("deadVar")) {
+
+                advance();
+
+                if (!peek().value.equals("(")) {
+
+                    while (peek().type != TokenType.EOF && !peek().value.equals(";")) {
+                        advance();
+                    }
+                    if (peek().value.equals(";")) advance();
+                    return;
+                } else {
+
+                    while (peek().type != TokenType.EOF && !peek().value.equals(";")) {
+                        advance();
+                    }
+                    if (peek().value.equals(";")) advance();
+                    return;
+                }
+            }
 
             if (index + 1 < tokens.size() && tokens.get(index + 1).value.equals("(")) {
-
                 parseFunctionCall();
-            }
-            else {
+            } else {
                 parseAssignment();
-                maybeInsertDeadCode();
+
             }
+            return;
         }
-        maybeInsertDeadCode();
+
+
+        if (peek().value.equals(";")) {
+            advance();
+            return;
+        }
+
+
+        advance();
     }
 
-    private void maybeInsertDeadCode() {
-        Random rand = new Random();
-        int chance = rand.nextInt(56);
 
-        if (chance < 20) {
-            int dummyNum = rand.nextInt(100);
-            String varName = "deadVar" + dummyNum;
-            System.out.println("int " + varName + " = " + dummyNum + " - " + dummyNum + ";");
-            writer.println("int " + varName + " = " + dummyNum + " - " + dummyNum + ";");
-        } else if (chance < 35) {
-            int dummyNum = rand.nextInt(100);
-            String deadCode = "if (0) { int x = " + dummyNum + "; }";
-            System.out.println(deadCode);
-            writer.println(deadCode);
-        } else if (chance < 45) {
-            String deadCode = "if (1) { int tmp = 0; tmp = tmp; }";
-            System.out.println(deadCode);
-            writer.println(deadCode);
-        } else if (chance < 55) {
-            String deadCode = "for (int i = 0; i < 0; i = i + 1) { int z = 0; }";
-            System.out.println(deadCode);
-            writer.println(deadCode);
-        }
-    }
-
+    private void maybeInsertDeadCode() { /* noop */ }
 
     private void parseReturnStatement() {
         advance();
@@ -151,39 +197,54 @@ public class Parser {
         writer.println("return " + expr + ";");
     }
 
-
-
     private void parseVariableDeclaration() {
         Token type = advance();
         Token name = advance();
 
-        String obfuscatedName = getObfuscatedName(name.value);
+
+        if (name.value.startsWith("deadVar")) {
+
+            while (peek().type != TokenType.EOF && !peek().value.equals(";")) {
+                advance();
+            }
+            if (peek().value.equals(";")) advance();
+            return;
+        }
+
+        String deobfName = getDeobfuscatedName(name.value);
 
         if (peek().type == TokenType.OPERATOR && peek().value.equals("=")) {
             advance();
-
             String expr = parseExpression();
-            System.out.println(type.value + " " + obfuscatedName + " = " + expr + ";");
-            writer.println(type.value + " " + obfuscatedName + " = " + expr + ";");
+            System.out.println(type.value + " " + deobfName + " = " + expr + ";");
+            writer.println(type.value + " " + deobfName + " = " + expr + ";");
         } else {
-            System.out.println(type.value + " " + obfuscatedName + ";");
-            writer.println(type.value + " " + obfuscatedName + ";");
+            System.out.println(type.value + " " + deobfName + ";");
+            writer.println(type.value + " " + deobfName + ";");
         }
 
         match(TokenType.SEPARATOR, true);
     }
 
-
-
     private void parseAssignment() {
         Token name = advance();
-        String obfuscatedName = getObfuscatedName(name.value);
+
+
+        if (name.value.startsWith("deadVar")) {
+            while (peek().type != TokenType.EOF && !peek().value.equals(";")) {
+                advance();
+            }
+            if (peek().value.equals(";")) advance();
+            return;
+        }
+
+        String deobfName = getDeobfuscatedName(name.value);
 
         if (match(TokenType.OPERATOR, false) && peek().value.equals("=")) {
             advance();
             String expr = parseExpression();
-            System.out.println(obfuscatedName + " = " + expr + ";");
-            writer.println(obfuscatedName + " = " + expr + ";");
+            System.out.println(deobfName + " = " + expr + ";");
+            writer.println(deobfName + " = " + expr + ";");
         } else {
             error("Expected '=' after variable name.");
         }
@@ -194,6 +255,45 @@ public class Parser {
     private void parseIfStatement() {
         advance();
         expectSymbol("(");
+
+
+        if (peek().type == TokenType.NUMBER && (index + 1 < tokens.size()) && tokens.get(index + 1).value.equals(")")) {
+            String num = advance().value;
+            expectSymbol(")");
+
+
+            if (peek().value.equals("{")) {
+                skipBlock();
+            } else {
+
+                skipSingleStatement();
+            }
+
+
+            while (peek().type == TokenType.KEYWORD && peek().value.equals("else")) {
+
+                advance();
+                if (peek().type == TokenType.KEYWORD && peek().value.equals("if")) {
+
+                    parseIfStatement();
+                } else {
+
+                    expectSymbol("{");
+                    System.out.println("else {");
+                    writer.println("else {");
+                    while (!peek().value.equals("}")) {
+                        parseStatement();
+                    }
+                    advance();
+                    System.out.println("}");
+                    writer.println("}");
+                    break;
+                }
+            }
+            return;
+        }
+
+
         String condition = parseCondition();
         expectSymbol(")");
 
@@ -204,13 +304,13 @@ public class Parser {
         while (!peek().value.equals("}")) {
             parseStatement();
         }
-        advance();
+        advance(); 
         System.out.println("}");
         writer.println("}");
 
-
+      
         while (peek().type == TokenType.KEYWORD && peek().value.equals("else")) {
-            advance();
+            advance(); 
             if (peek().type == TokenType.KEYWORD && peek().value.equals("if")) {
                 advance();
                 expectSymbol("(");
@@ -243,7 +343,6 @@ public class Parser {
         }
     }
 
-
     private void parseWhileLoop() {
         advance();
 
@@ -251,7 +350,6 @@ public class Parser {
             error("Expected '(' after 'while'");
         }
         advance();
-
 
         Token left = advance();
         Token op = advance();
@@ -267,20 +365,20 @@ public class Parser {
         }
         advance();
 
-        String leftObf = getObfuscatedName(left.value);
-        System.out.println("while (" + leftObf + " " + op.value + " " + right.value + ") {");
-        writer.println("while (" + leftObf + " " + op.value + " " + right.value + ") {");
+        String leftName = getDeobfuscatedName(left.value);
+        String rightValue = (right.type == TokenType.IDENTIFIER) ? getDeobfuscatedName(right.value) : right.value;
+
+        System.out.println("while (" + leftName + " " + op.value + " " + rightValue + ") {");
+        writer.println("while (" + leftName + " " + op.value + " " + rightValue + ") {");
 
         while (!peek().value.equals("}")) {
             parseStatement();
         }
 
-        advance();
+        advance(); 
         System.out.println("}");
         writer.println("}");
     }
-
-
 
     private String parseExpression() {
         return parseTerm();
@@ -310,42 +408,8 @@ public class Parser {
         return expr;
     }
 
-
-    private String obfuscateIdentifier(String name) {
-        Random rand = new Random();
-        String obf = getObfuscatedName(name);
-        int choice = rand.nextInt(5);
-
-        switch (choice) {
-            case 0: return "(" + obf + " + 0)";
-            case 1: return "(" + obf + " - 0)";
-            case 2: return "(" + obf + " * 1)";
-            case 3: return "(" + obf + " / 1)";
-            case 4: return "(" + obf + " + (" + obf + " - " + obf + "))";
-            default: return obf;
-        }
-    }
-
-    private String obfuscateNumber(String value) {
-        Random rand = new Random();
-        int choice = rand.nextInt(5);
-        double num = Double.parseDouble(value);
-
-        switch (choice) {
-            case 0: return "(" + value + " + 0)";
-            case 1: return "(" + (num * 2) + " / 2)";
-            case 2: return "(" + (num + 10) + " - 10)";
-            case 3: return "(" + (num / 0.5) + " * 0.5)";
-            case 4: return "(" + (num * 3) + " / 3)";
-            default: return value;
-        }
-    }
-
-
-
     private String parsePrimary() {
         Token current = peek();
-
 
         if (current.value.equals("(")) {
             advance();
@@ -354,28 +418,30 @@ public class Parser {
             return "(" + expr + ")";
         }
 
-
         if (current.value.equals("-")) {
             if (index + 1 < tokens.size() && tokens.get(index + 1).type == TokenType.NUMBER) {
                 advance();
                 String num = advance().value;
-                return obfuscateNumber("-" + num);
+                return "-" + num; 
             }
         }
 
-
         if (current.type == TokenType.NUMBER) {
             String value = advance().value;
-            return obfuscateNumber(value);
+            return value; 
         }
-
 
         if (current.type == TokenType.IDENTIFIER) {
             if (index + 1 < tokens.size() && tokens.get(index + 1).value.equals("(")) {
                 return parseFunctionCallInline();
             } else {
                 String name = advance().value;
-                return obfuscateIdentifier(name);
+               
+                if (name.startsWith("deadVar")) {
+                  
+                    return "0";
+                }
+                return getDeobfuscatedName(name);
             }
         }
 
@@ -386,10 +452,18 @@ public class Parser {
     private String parseVariableDeclarationAsString() {
         Token type = advance();
         Token name = advance();
-        String obfuscatedName = getObfuscatedName(name.value);
+
+        
+        if (name.value.startsWith("deadVar")) {
+            while (peek().type != TokenType.EOF && !peek().value.equals(";")) advance();
+            if (peek().value.equals(";")) advance();
+            return type.value + " " + "/*removed*/";
+        }
+
+        String deobfName = getDeobfuscatedName(name.value);
 
         StringBuilder result = new StringBuilder();
-        result.append(type.value).append(" ").append(obfuscatedName);
+        result.append(type.value).append(" ").append(deobfName);
 
         if (peek().type == TokenType.OPERATOR && peek().value.equals("=")) {
             advance();
@@ -401,36 +475,46 @@ public class Parser {
         return result.toString();
     }
 
-
     private void parseForLoop() {
-        advance();
+        advance(); 
         expectSymbol("(");
 
+      
+        if (index + 1 < tokens.size() &&
+                tokens.get(index).type == TokenType.KEYWORD &&
+                tokens.get(index).value.equals("int") &&
+                tokens.get(index + 1).value.equals("i")) {
+
+            
+            while (peek().type != TokenType.EOF && !peek().value.equals("{")) {
+                advance();
+            }
+            if (peek().value.equals("{")) {
+                skipBlock(); 
+            }
+            return;
+        }
+
+       
         String initialization = parseVariableDeclarationAsString();
 
         Token left = advance();
         Token op = advance();
         Token right = advance();
 
-        String rightValue = (right.type == TokenType.IDENTIFIER) ? getObfuscatedName(right.value) : right.value;
-        String condition = getObfuscatedName(left.value) + " " + op.value + " " + rightValue;
+        String rightValue = (right.type == TokenType.IDENTIFIER) ? getDeobfuscatedName(right.value) : right.value;
+        String condition = getDeobfuscatedName(left.value) + " " + op.value + " " + rightValue;
         expectSymbol(";");
 
-
         Token incLeft = advance();
-        advance();
+        advance(); 
         String rightExpr = parseExpression();
-        String increment = getObfuscatedName(incLeft.value) + " = " + rightExpr;
+        String increment = getDeobfuscatedName(incLeft.value) + " = " + rightExpr;
         expectSymbol(")");
         expectSymbol("{");
 
-
-
         System.out.println("for (" + initialization + "; " + condition + "; " + increment + ") {");
         writer.println("for (" + initialization + "; " + condition + "; " + increment + ") {");
-
-
-
 
         while (!peek().value.equals("}")) {
             parseStatement();
@@ -447,20 +531,20 @@ public class Parser {
         }
         advance();
     }
+
     private void parseFunctionDeclaration() {
         Token returnType = advance();
         Token funcName = advance();
-        String obfuscatedFuncName = funcName.value.equals("main") ? "main" : getObfuscatedName(funcName.value);
+        String deobfFuncName = funcName.value.equals("main") ? "main" : getDeobfuscatedFunctionName(funcName.value);
 
         expectSymbol("(");
 
-
-        List<String> obfuscatedParams = new ArrayList<>();
+        List<String> deobfParams = new ArrayList<>();
         while (!peek().value.equals(")")) {
             Token paramType = advance();
             Token paramName = advance();
-            String obfuscatedParamName = getObfuscatedName(paramName.value);
-            obfuscatedParams.add(paramType.value + " " + obfuscatedParamName);
+            String deobfParamName = getDeobfuscatedName(paramName.value);
+            deobfParams.add(paramType.value + " " + deobfParamName);
 
             if (peek().value.equals(",")) {
                 advance();
@@ -471,16 +555,12 @@ public class Parser {
 
         expectSymbol("{");
 
-        System.out.println(returnType.value + " " + obfuscatedFuncName + "(" + String.join(", ", obfuscatedParams) + ") {");
-        writer.println(returnType.value + " " + obfuscatedFuncName + "(" + String.join(", ", obfuscatedParams) + ") {");
-
-        maybeInsertDeadCode();
-
+        System.out.println(returnType.value + " " + deobfFuncName + "(" + String.join(", ", deobfParams) + ") {");
+        writer.println(returnType.value + " " + deobfFuncName + "(" + String.join(", ", deobfParams) + ") {");
 
         while (!peek().value.equals("}")) {
             parseStatement();
         }
-        maybeInsertDeadCode();
 
         advance();
         System.out.println("}");
@@ -492,7 +572,11 @@ public class Parser {
         while (!peek().value.equals(")") && peek().type != TokenType.EOF) {
             Token t = advance();
             if (t.type == TokenType.IDENTIFIER) {
-                cond.append(getObfuscatedName(t.value));
+                if (t.value.startsWith("deadVar")) {
+                    cond.append("0"); 
+                } else {
+                    cond.append(getDeobfuscatedName(t.value));
+                }
             } else {
                 cond.append(t.value);
             }
@@ -513,7 +597,10 @@ public class Parser {
             while (!peek().value.equals(")")) {
                 Token var = advance();
                 if (var.type == TokenType.IDENTIFIER) {
-                    args.append(", ").append(getObfuscatedName(var.value));
+                    
+                    if (!var.value.startsWith("deadVar")) {
+                        args.append(", ").append(getDeobfuscatedName(var.value));
+                    }
                 } else {
                     args.append(", ").append(var.value);
                 }
@@ -545,8 +632,11 @@ public class Parser {
                 error("Expected '&' before variable in scanf");
             }
             Token var = advance();
-            String obfVar = getObfuscatedName(var.value);
-            args.append(", &").append(obfVar);
+           
+            if (!var.value.startsWith("deadVar")) {
+                String deobfVar = getDeobfuscatedName(var.value);
+                args.append(", &").append(deobfVar);
+            }
         }
 
         expectSymbol(")");
@@ -556,10 +646,9 @@ public class Parser {
         writer.println("scanf(" + args + ");");
     }
 
-
     private void parseFunctionCall() {
         Token func = advance();
-        String obfuscatedName = func.value.equals("main") ? "main" : getObfuscatedName(func.value);
+        String deobfName = func.value.equals("main") ? "main" : getDeobfuscatedFunctionName(func.value);
 
         expectSymbol("(");
 
@@ -575,12 +664,13 @@ public class Parser {
         expectSymbol(")");
         match(TokenType.SEPARATOR, true);
 
-        System.out.println(obfuscatedName + "(" + String.join(", ", args) + ");");
-        writer.println(obfuscatedName + "(" + String.join(", ", args) + ");");
+        System.out.println(deobfName + "(" + String.join(", ", args) + ");");
+        writer.println(deobfName + "(" + String.join(", ", args) + ");");
     }
+
     private String parseFunctionCallInline() {
         Token func = advance();
-        String obfName = func.value.equals("main") ? "main" : getObfuscatedName(func.value);
+        String deobfName = func.value.equals("main") ? "main" : getDeobfuscatedFunctionName(func.value);
 
         expectSymbol("(");
 
@@ -594,7 +684,33 @@ public class Parser {
         }
 
         expectSymbol(")");
-        return obfName + "(" + String.join(", ", args) + ")";
+        return deobfName + "(" + String.join(", ", args) + ")";
     }
 
+    
+    private void skipBlock() {
+        if (!peek().value.equals("{")) return;
+        
+        advance();
+        int depth = 1;
+        while (index < tokens.size() && depth > 0) {
+            Token t = advance();
+            if (t.value.equals("{")) depth++;
+            else if (t.value.equals("}")) depth--;
+        }
+       
+    }
+
+    
+    private void skipSingleStatement() {
+        if (peek().value.equals("{")) {
+            skipBlock();
+            return;
+        }
+       
+        while (index < tokens.size() && !peek().value.equals(";")) {
+            advance();
+        }
+        if (peek().value.equals(";")) advance();
+    }
 }
